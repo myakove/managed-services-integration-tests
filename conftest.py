@@ -4,9 +4,16 @@ import shutil
 
 import pytest
 import yaml
+from ocp_resources.node import Node
+from ocp_resources.pod import Pod
+from ocp_resources.resource import get_client
+from ocp_utilities.data_collector import (
+    collect_pods_data,
+    collect_resources_yaml_instance,
+    prepare_pytest_item_data_dir,
+)
 from pytest_testconfig import config as py_config
 
-import ocp_utilities
 from utilities.logger import separator, setup_logging
 
 
@@ -48,19 +55,6 @@ def pytest_cmdline_main(config):
 
 
 def pytest_sessionstart(session):
-    if session.config.getoption("log_collector"):
-        # set log_collector to True if it is explicitly requested,
-        # otherwise use what is set in the global config
-        py_config["log_collector"] = True
-
-    if py_config.get("log_collector", False):
-        # this could already be set in the global config
-        # if it is set then the environment must be configured so that openshift-python-wrapper can use it
-        os.environ["TEST_COLLECT_LOGS"] = "1"
-
-    # store the base directory for log collection in the environment so it can be used by utilities
-    os.environ["TEST_COLLECT_BASE_DIR"] = session.config.getoption("log_collector_dir")
-
     data_collector = session.config.getoption("--data-collector")
     if data_collector:
         with open(data_collector, "r") as fd:
@@ -110,8 +104,10 @@ def pytest_runtest_setup(item):
     if item.session.config.getoption("--data-collector"):
         py_config["data_collector"][
             "collector_directory"
-        ] = ocp_utilities.data_collector.prepare_test_data_dir(
-            item=item, prefix="setup"
+        ] = prepare_pytest_item_data_dir(
+            item=item,
+            base_directory=py_config["data_collector"]["data_collector_base_directory"],
+            subdirectory_name="setup",
         )
 
 
@@ -148,7 +144,11 @@ def pytest_runtest_call(item):
     if item.session.config.getoption("--data-collector"):
         py_config["data_collector"][
             "collector_directory"
-        ] = ocp_utilities.data_collector.prepare_test_data_dir(item=item, prefix="call")
+        ] = prepare_pytest_item_data_dir(
+            item=item,
+            base_directory=py_config["data_collector"]["data_collector_base_directory"],
+            subdirectory_name="call",
+        )
 
 
 def pytest_runtest_teardown(item):
@@ -156,7 +156,11 @@ def pytest_runtest_teardown(item):
     if item.session.config.getoption("--data-collector"):
         py_config["data_collector"][
             "collector_directory"
-        ] = ocp_utilities.data_collector.prepare_test_data_dir(item=item, prefix="call")
+        ] = prepare_pytest_item_data_dir(
+            item=item,
+            base_directory=py_config["data_collector"]["data_collector_base_directory"],
+            subdirectory_name="teardown",
+        )
 
 
 @pytest.fixture(scope="session")
@@ -166,3 +170,20 @@ def junitxml_plugin(request, record_testsuite_property):
         if request.config.pluginmanager.has_plugin("junitxml")
         else None
     )
+
+
+def pytest_exception_interact(node, call, report):
+    BASIC_LOGGER.error(report.longreprtext)
+    if node.session.config.getoption("--data-collector"):
+        resources_to_collect = [Node]
+        base_directory = py_config["data_collector"]["data_collector_base_directory"]
+        try:
+            collect_resources_yaml_instance(
+                resources_to_collect=resources_to_collect, base_directory=base_directory
+            )
+            pods = list(Pod.get(dyn_client=get_client()))
+            collect_pods_data(pods_list=pods, base_directory=base_directory)
+
+        except Exception as exp:
+            LOGGER.warning(f"Failed to collect resources: {exp}")
+            return
