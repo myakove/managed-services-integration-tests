@@ -36,11 +36,13 @@ YAML format:
 ```yaml
     data_collector_base_directory: "<base directory for data collection>"
     collect_data_function: "<import path for data collection method>"
+
 ```
 YAML Example:
 ```yaml
     data_collector_base_directory: "tests-collected-info"
     collect_data_function: "utilities.data_collector.collect_data"
+    collect_pod_logs: true
 ```
 ```bash
 pipenv run pytest .... --data-collector=data-collector.yaml

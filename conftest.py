@@ -48,19 +48,6 @@ def pytest_cmdline_main(config):
 
 
 def pytest_sessionstart(session):
-    if session.config.getoption("log_collector"):
-        # set log_collector to True if it is explicitly requested,
-        # otherwise use what is set in the global config
-        py_config["log_collector"] = True
-
-    if py_config.get("log_collector", False):
-        # this could already be set in the global config
-        # if it is set then the environment must be configured so that openshift-python-wrapper can use it
-        os.environ["TEST_COLLECT_LOGS"] = "1"
-
-    # store the base directory for log collection in the environment so it can be used by utilities
-    os.environ["TEST_COLLECT_BASE_DIR"] = session.config.getoption("log_collector_dir")
-
     data_collector = session.config.getoption("--data-collector")
     if data_collector:
         with open(data_collector, "r") as fd:
