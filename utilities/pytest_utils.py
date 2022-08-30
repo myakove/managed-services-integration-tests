@@ -3,6 +3,8 @@ import os
 
 import pytest as pytest
 
+import ocp_utilities
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -26,8 +28,8 @@ def exit_pytest_execution(
         junitxml_property (pytest plugin): record_testsuite_property
     """
     if filename:
-        write_to_extras_file(
-            extras_file_name=filename,
+        ocp_utilities.data_collector.write_to_file(
+            file_name=filename,
             content=message,
             extra_dir_name="pytest_exit_errors",
         )
