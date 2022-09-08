@@ -42,6 +42,9 @@ Logs will be available under tests-collected-info/ folder.
 #### Cluster upgrade tests
 `TODO`
 
+## Interact with OCM client
+Refer to [OCM python client wrapper README](https://github.com/RedHatQE/openshift-cluster-management-python-wrapper/blob/main/README.md#examples)
+
 ### Setting log level in command line
 
 In order to run a test with a log level that is different from the default,
