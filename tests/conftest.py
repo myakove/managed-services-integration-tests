@@ -22,6 +22,9 @@ BASIC_LOGGER = logging.getLogger("basic")
 
 def get_vault_config():
     try:
+        hashi_vault_env_var_name = "ANSIBLE_HASHI_VAULT_SECRET_ID"
+        secret_id = os.getenv(hashi_vault_env_var_name)
+        assert secret_id, f"{hashi_vault_env_var_name} environment variable is not set."
         base_path = f"apps/data/{MPS_QE}/managed-services/rh-interop-qe-ms-account"
 
         vault_client = hvacClient(
@@ -29,7 +32,7 @@ def get_vault_config():
         )
         vault_client.auth.approle.login(
             role_id=MPS_QE,
-            secret_id=os.environ["ANSIBLE_HASHI_VAULT_SECRET_ID"],
+            secret_id=secret_id,
         )
 
         return vault_client.read(path=base_path)
