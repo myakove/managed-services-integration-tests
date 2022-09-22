@@ -1,8 +1,7 @@
 import logging
+import os
 
 import pytest as pytest
-
-import ocp_utilities
 
 
 LOGGER = logging.getLogger(__name__)
@@ -27,11 +26,25 @@ def exit_pytest_execution(
         junitxml_property (pytest plugin): record_testsuite_property
     """
     if filename:
-        ocp_utilities.data_collector.write_to_file(
-            file_name=filename,
+        write_to_extras_file(
+            extras_file_name=filename,
             content=message,
             extra_dir_name="pytest_exit_errors",
         )
     if junitxml_property:
         junitxml_property(name="exit_code", value=return_code)
     pytest.exit(msg=message, returncode=return_code)
+
+
+# TODO: Remove once added to openshift-python-utilities
+def write_to_extras_file(extras_file_name, content, extra_dir_name="extras"):
+    base_dir = os.environ.get("TEST_DIR_LOG", "/tmp")
+    extras_dir = os.path.join(base_dir, extra_dir_name)
+    os.makedirs(extras_dir, exist_ok=True)
+    extras_file_path = os.path.join(extras_dir, extras_file_name)
+
+    try:
+        with open(extras_file_path, "w") as fd:
+            fd.write(content)
+    except Exception as exp:
+        LOGGER.error(f"Failed to write extras to file: {extras_file_path} {exp}")

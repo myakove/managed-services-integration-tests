@@ -1,12 +1,9 @@
 import logging
 import os
-import shutil
 
 import pytest
-import yaml
 from pytest_testconfig import config as py_config
 
-import ocp_utilities
 from utilities.logger import separator, setup_logging
 
 
@@ -17,19 +14,25 @@ BASIC_LOGGER = logging.getLogger("basic")
 # pytest fixtures
 def pytest_addoption(parser):
     storage_group = parser.getgroup(name="Storage")
-    data_collector_group = parser.getgroup(name="DataCollector")
+    log_collector_group = parser.getgroup(name="LogCollector")
     ocm_group = parser.getgroup(name="OCM")
     upgrade_group = parser.getgroup(name="Upgrade")
 
     # Storage addoption
     storage_group.addoption("--storage-classes", help="Storage classes to test")
 
-    # Data collector group
-    data_collector_group.addoption(
-        "--data-collector",
-        help="pass YAML file path to enable data collector to capture additional logs and resources",
+    # Log collector group
+    log_collector_group.addoption(
+        "--log-collector",
+        help="Enable log collector to capture additional logs and resources for failed tests",
+        action="store_true",
     )
-    data_collector_group.addoption(
+    log_collector_group.addoption(
+        "--log-collector-dir",
+        help="Path for log collector to store the logs",
+        default="tests-collected-info",
+    )
+    log_collector_group.addoption(
         "--pytest-log-file",
         help="Path to pytest log file",
         default="pytest-tests.log",
@@ -48,18 +51,25 @@ def pytest_cmdline_main(config):
 
 
 def pytest_sessionstart(session):
-    data_collector = session.config.getoption("--data-collector")
-    if data_collector:
-        with open(data_collector, "r") as fd:
-            py_config["data_collector"] = yaml.safe_load(fd.read())
-            shutil.rmtree(
-                py_config["data_collector"]["data_collector_base_directory"],
-                ignore_errors=True,
-            )
+    if session.config.getoption("log_collector"):
+        # set log_collector to True if it is explicitly requested,
+        # otherwise use what is set in the global config
+        py_config["log_collector"] = True
+
+    if py_config.get("log_collector", False):
+        # this could already be set in the global config
+        # if it is set then the environment must be configured so that openshift-python-wrapper can use it
+        os.environ["TEST_COLLECT_LOGS"] = "1"
+
+    # store the base directory for log collection in the environment so it can be used by utilities
+    os.environ["TEST_COLLECT_BASE_DIR"] = session.config.getoption("log_collector_dir")
 
     tests_log_file = session.config.getoption("pytest_log_file")
     if os.path.exists(tests_log_file):
-        shutil.rmtree(tests_log_file, ignore_errors=True)
+        os.remove(tests_log_file)
+    tests_log_file = session.config.getoption("pytest_log_file")
+    if os.path.exists(tests_log_file):
+        os.remove(tests_log_file)
 
     setup_logging(
         log_file=tests_log_file,
@@ -94,13 +104,6 @@ def pytest_runtest_setup(item):
     BASIC_LOGGER.info(f"\n{separator(symbol_='-', val=item.name)}")
     BASIC_LOGGER.info(f"{separator(symbol_='-', val='SETUP')}")
 
-    if item.session.config.getoption("--data-collector"):
-        py_config["data_collector"][
-            "collector_directory"
-        ] = ocp_utilities.data_collector.prepare_test_data_dir(
-            item=item, prefix="setup"
-        )
-
 
 def pytest_sessionfinish(session, exitstatus):
     reporter = session.config.pluginmanager.get_plugin("terminalreporter")
@@ -118,32 +121,13 @@ def pytest_sessionfinish(session, exitstatus):
     )
     BASIC_LOGGER.info(f"{separator(symbol_='-', val=summary)}")
 
-    # Remove empty directories from data collector directory
-    if session.config.getoption("--data-collector"):
-        collector_directory = py_config["data_collector"][
-            "data_collector_base_directory"
-        ]
-        for root, dirs, files in os.walk(collector_directory, topdown=False):
-            for _dir in dirs:
-                dir_path = os.path.join(root, _dir)
-                if not os.listdir(dir_path):
-                    shutil.rmtree(dir_path, ignore_errors=True)
-
 
 def pytest_runtest_call(item):
     BASIC_LOGGER.info(f"{separator(symbol_='-', val='CALL')}")
-    if item.session.config.getoption("--data-collector"):
-        py_config["data_collector"][
-            "collector_directory"
-        ] = ocp_utilities.data_collector.prepare_test_data_dir(item=item, prefix="call")
 
 
 def pytest_runtest_teardown(item):
     BASIC_LOGGER.info(f"{separator(symbol_='-', val='TEARDOWN')}")
-    if item.session.config.getoption("--data-collector"):
-        py_config["data_collector"][
-            "collector_directory"
-        ] = ocp_utilities.data_collector.prepare_test_data_dir(item=item, prefix="call")
 
 
 @pytest.fixture(scope="session")
