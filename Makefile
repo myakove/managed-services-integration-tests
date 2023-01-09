@@ -18,7 +18,7 @@ poetry:
 	poetry show
 
 run_tests:
-	poetry run pytest tests/cluster_sanity
+	poetry run pytest tests -m smoke
 
 build-container:
 	$(IMAGE_BUILD_CMD) build --no-cache -f builder/Dockerfile -t $(FULL_OPERATOR_IMAGE) .
