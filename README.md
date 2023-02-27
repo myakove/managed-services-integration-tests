@@ -26,14 +26,10 @@ To remove current env
 ```bash
 poetry env remove <env name>
 ```
-To clear poetry cache (needed before update if there is an existing update but the package is not updated)
-```bash
-poetry cache list # get poetry available cache list
-poetry cache clear --all <cache name> # delete all cache (except _default_cache)
-```
+
 To update one package
 ```bash
-poetry update openshift-python-wrapper
+poetry update openshift-python-wrapper --no-cache
 ```
 
 # Getting started
